@@ -4,7 +4,7 @@ Cross-architecture virtualization (x86 guest on an ARM host, or vice versa) is e
 in mainstream tools like VirtualBox or Multipass. Always use same-architecture guests.
 
 Use:
-- [x86](./x86/) on Intel Macs or other Windows/Linux machines
+- [x86](./x86_64/) on Intel Macs or other Windows/Linux machines
 - [aarch64](./aarch64/) on Apple Silicon Macs and ARM-based Windows/Linux installations
   - **Ops Manager cannot run natively on ARM64**: host it on an x86_64 machine (cloud/on-prem)
   - or use Cloud Manager
