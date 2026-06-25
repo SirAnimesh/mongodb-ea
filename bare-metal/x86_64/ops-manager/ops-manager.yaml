@@ -1,0 +1,22 @@
+images:
+  - location: "https://download.rockylinux.org/pub/rocky/9.8/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2"
+    arch: "x86_64"
+    digest: "sha256:92c206cc6f790c61583247eefe87890f8828420662c17cacf247cec78ab4eec8"
+
+cpus: 2
+memory: "4GiB"        # Ops Manager is Java-based and heavy, needs at least 4GB
+disk: "30GiB"
+
+provision:
+  - mode: system
+    file: provision-ops-manager.sh
+
+mounts: []
+
+containerd:
+  system: false
+  user: false
+
+portForwards:
+  - guestPort: 8080   # Ops Manager UI
+    hostIP: "127.0.0.1"
