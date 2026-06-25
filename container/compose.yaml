@@ -1,0 +1,50 @@
+services:
+  ops-manager-db:
+    image: docker.io/mongodb/mongodb-enterprise-server:latest
+    container_name: ops-manager-db
+    volumes:
+      - ops-manager-db-data:/data/db
+
+  ops-manager:
+    build:
+      context: ./ops-manager
+      image: ops-manager
+    container_name: ops-manager
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ops-manager-db
+  
+  node1:
+    build:
+      context: ./node
+      image: node
+    container_name: node1
+    env_field: .env
+    volumes:
+      - node1-data:/data/db
+  
+  node2:
+    build:
+      context: ./node
+      image: node
+    container_name: node2
+    env_field: .env
+    volumes:
+      - node2-data:/data/db
+
+  node3:
+    build:
+      context: ./node
+      image: node
+    container_name: node3
+    env_field: .env
+    volumes:
+      - node3-data:/data/db
+
+volumes:
+  ops-manager-db-data:
+  node1-data:
+  node2-data:
+  node3-data:
+    
