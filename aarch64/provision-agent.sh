@@ -12,7 +12,7 @@ esac
 
 # --- Download agent package ---
 
-VERSION="13.53.0.10826-1"
+VERSION="latest"
 PKG="mongodb-mms-automation-agent-manager-${VERSION}.${ARCH}.${OS}.rpm"
 URL="https://cloud.mongodb.com/download/agent/automation/${PKG}"
 

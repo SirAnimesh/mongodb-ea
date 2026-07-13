@@ -6,7 +6,46 @@ Ops Manager has no ARM64 build. This `aarch64` demo natively delivers:
 - MongoDB agent on each node
 - management using Cloud Manager
 
+## Workflow
+
+Make sure you've followed [Pre-requisites](#pre-requisites) instructions. Then run:
+
+```shell
+./cluster.sh
+```
+
+1. `cloud-init` (by Lima) installs the MongoDB agent and registers it to a Cloud Manager project
+2. You build the replica set from the Cloud Manager UI (`Deploy -> Replica Set`)
+3. Cloud Manager pushes the binaries and config to the agents
+
+This mimics how a real EA customer operates with Cloud Manager. It allows you to provision a cluster from the control 
+plane with no SSH.
+
+```shell
+# Check if provisioning completed successfully
+limactl shell mongo1 -- cloud-init status --wait
+
+# Check if the agent service is running
+limactl shell mongo1 -- systemctl is-active mongodb-mms-automation-agent
+
+# Get agent's log
+limactl shell mongo1 -- sudo tail -50 /var/log/mongodb-mms-automation/automation-agent.log
+```
+
 ## Pre-requisites
+
+### Install hypervisor (only for Linux)
+
+Lima is a lightweight orchestrator and wrapper. It delegates running VMs to a hypervisor. 
+
+On Windows, Lima uses WSL2. On macOS, Lima uses `Virtualization.framework`.
+
+On Linux, Lima natively targets QEMU using KVM (Kernel-based Virtual Machine). KVM allows QEMU to execute guest code 
+directly on the host CPU, giving you near-bare-metal performance.
+
+```shell
+sudo dnf install -y qemu-kvm qemu-system-aarch64
+```
 
 ### VM Manager
 
@@ -39,46 +78,4 @@ Create a `.env` file:
 ```
 MMS_GROUP_ID=xxxx
 MMS_API_KEY=xxxx
-```
-
-## Workflow
-
-1. `cloud-init` (by Lima) installs the MongoDB agent and registers it to a Cloud Manager project
-2. You build the replica set from the Cloud Manager UI (`Deploy -> Replica Set`)
-3. Cloud Manager pushes the binaries and config to the agents
-
-This mimics how a real EA customer operates with Cloud Manager. It allows you to provision a cluster from the control 
-plane with no SSH.
-
-### Start the nodes
-
-`mongod.yaml` is the single source of truth. Secrets are read from `.env` and injected as Lima params at
-create time — they are never stored in the template.
-
-```shell
-set -a; . ./.env; set +a            # load MMS_GROUP_ID / MMS_API_KEY into the shell
-
-for n in mongo1 mongo2 mongo3; do
-  limactl start --name="$n" \
-    --param MMS_GROUP_ID="$MMS_GROUP_ID" \
-    --param MMS_API_KEY="$MMS_API_KEY" \
-    --tty=false \
-    mongod.yaml
-done
-```
-
-> Lima bakes provisioning in at **create time only**. Editing `mongod.yaml` does not touch a running VM —
-> `limactl delete <name>` and re-create it to pick up changes.
-
-### Verify
-
-```shell
-# Check if provisioning completed successfully
-limactl shell mongo1 -- cloud-init status --wait
-
-# Check if the agent service is running
-limactl shell mongo1 -- systemctl is-active mongodb-mms-automation-agent
-
-# Get agent's log
-limactl shell mongo1 -- sudo tail -50 /var/log/mongodb-mms-automation/automation-agent.log
 ```
