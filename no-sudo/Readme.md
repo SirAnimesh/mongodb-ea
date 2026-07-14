@@ -17,11 +17,12 @@ Because we have no internet, Ops Manager needs these two extra resources to run 
 
 ## Workflow
 
-1. Download all tarball archives from MongoDB Download Center. Below are links for RHEL 8 x86_64:
-   - [MongoDB Enterprise 8.3.4](https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel8-8.3.4.tgz)
-   - [Ops Manager 8.0.24](https://downloads.mongodb.com/on-prem-mms/tar/mongodb-mms-8.0.24.500.20260610T1425Z.tar.gz)
-   - [MongoDB Shell 2.9.0](https://downloads.mongodb.com/compass/mongosh-2.9.0-linux-x64.tgz)
+1. Download all tarball archives from MongoDB Download Center. Below are links for RHEL 9 x64:
+   - [MongoDB Enterprise 8.3.4](https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel93-8.3.4.tgz)
+   - [Ops Manager 8.0.25](https://downloads.mongodb.com/on-prem-mms/tar/mongodb-mms-8.0.25.500.20260703T0841Z.tar.gz)
+   - [MongoDB Shell 2.9.2](https://downloads.mongodb.com/compass/mongosh-2.9.2-linux-x64.tgz)
    - [Versions](https://opsmanager.mongodb.com/static/version_manifest/8.0.json) manifest
+   - [Database Tools](https://fastdl.mongodb.org/tools/db/mongodb-database-tools-rhel93-x86_64-100.17.0.tgz)
 
 2. Install MongoDB for Ops Manager application:
    ```shell
@@ -33,14 +34,14 @@ Because we have no internet, Ops Manager needs these two extra resources to run 
    ./ops-manager.sh
    ```
 
-4. To enable **Local Mode** in the Ops Manager UI, go to `Version Manager` > `Local Mode` and upload:
-   - `versions.json`
-   - MongoDB database tarball archive
+4. To enable **Local Mode**, place the `mongodb_version_manifest.json` file and MongoDB database
+   tarball archive in `${HOME}/mongodb-binaries`. Ops Manager picks them up automatically via the
+   `automation.versions.directory` setting in `conf-mms.properties`.
 
 5. (on each data-bearing node) Download the Automation Agent tarball from Ops Manager host and install:
    ```shell
    cd $HOME/downloads
-   curl -OL http://<your-ops-manager-ip>:8085/download/agent/automation/mongodb-mms-automation-agent-manager-latest.x86_64.tar.gz
+   curl -OL http://<your-ops-manager-ip>:8085/download/agent/automation/mongodb-mms-automation-agent-latest.rhel8_x86_64.tar.gz
    ./automation-agent.sh
    ```
 

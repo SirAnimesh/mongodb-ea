@@ -10,7 +10,7 @@ IFS=$'\n\t'
 
 readonly ARCHIVE_DIR="${HOME}/downloads"
 readonly INSTALL_DIR="${HOME}/ops-manager"
-readonly ARCHIVE_NAME="mongodb-mms.tar.gz"
+readonly ARCHIVE_NAME="mongodb-mms-8.0.25.500.20260703T0841Z.tar.gz"
 readonly FULL_ARCHIVE_PATH="${ARCHIVE_DIR}/${ARCHIVE_NAME}"
 readonly CONFIG_FILE="${INSTALL_DIR}/conf/mms.conf"
 readonly PROPERTIES_FILE="${INSTALL_DIR}/conf/conf-mms.properties"
@@ -37,7 +37,21 @@ sed -i 's|^BASE_PORT=.*|BASE_PORT="8085"|' "${CONFIG_FILE}"
 # Set the Ops Manager URL to localhost:8085
 sed -i 's|^mms.centralUrl=.*|mms.centralUrl=http://127.0.0.1:8085|' "${PROPERTIES_FILE}"
 # Point Ops Manager to the local MongoDB replica set
-sed -i 's|^mms.mongo.uri=.*|mms.mongo.uri=mongodb://127.0.0.1:27017/?replicaSet=opsmgrRS|' "${PROPERTIES_FILE}"
+sed -i 's|^mongo.mongoUri=.*|mongo.mongoUri=mongodb://127.0.0.1:27017/?replicaSet=opsmgrRS|' "${PROPERTIES_FILE}"
+
+# Enable Local Mode so Ops Manager serves MongoDB binaries to agents without internet
+cat >> "${PROPERTIES_FILE}" << EOF
+
+# Local Mode
+automation.versions.source=local
+automation.versions.directory=${HOME}/mongodb-binaries
+
+# Agent defaults
+automation.default.monitoringAgentLogFile=${HOME}/logs/automation-agent.log
+automation.default.backupAgentLogFile=${HOME}/backups/local.config.backup
+automation.default.downloadBase=${HOME}/binaries
+automation.default.dataRoot=${HOME}/data
+EOF
 
 # --- Start Ops Manager ---
 
