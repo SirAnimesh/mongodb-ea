@@ -8,41 +8,64 @@ services:
   ops-manager:
     build:
       context: ./ops-manager
-      image: ops-manager
+    platform: linux/amd64
+    image: mongodb-ops-manager
+    pull_policy: build
     container_name: ops-manager
     ports:
       - "8080:8080"
+    volumes:
+      - ops-manager-keys:/etc/mongodb-mms
     depends_on:
       - ops-manager-db
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
   
   node1:
     build:
       context: ./node
-      image: node
+    image: mongodb-rs-node
+    pull_policy: build
     container_name: node1
-    env_field: .env
+    env_file: .env
     volumes:
       - node1-data:/data/db
-  
+    depends_on:
+      ops-manager:
+        condition: service_healthy
+
   node2:
     build:
       context: ./node
-      image: node
+    image: mongodb-rs-node
+    pull_policy: build
     container_name: node2
-    env_field: .env
+    env_file: .env
     volumes:
       - node2-data:/data/db
+    depends_on:
+      ops-manager:
+        condition: service_healthy
 
   node3:
     build:
       context: ./node
-      image: node
+    image: mongodb-rs-node
+    pull_policy: build
     container_name: node3
-    env_field: .env
+    env_file: .env
     volumes:
       - node3-data:/data/db
+    depends_on:
+      ops-manager:
+        condition: service_healthy
 
 volumes:
+  ops-manager-keys:
   ops-manager-db-data:
   node1-data:
   node2-data:

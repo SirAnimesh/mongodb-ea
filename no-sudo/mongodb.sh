@@ -10,7 +10,7 @@ IFS=$'\n\t'
 
 readonly ARCHIVE_DIR="${HOME}/downloads"
 readonly DB_INSTALL_DIR="${HOME}/mongodb"
-readonly DB_ARCHIVE_NAME="mongodb-linux-x64-enterprise-7.0.22.tgz"
+readonly DB_ARCHIVE_NAME="mongodb-linux-x86_64-enterprise-rhel93-8.3.4.tgz"
 readonly FULL_DB_ARCHIVE_PATH="${ARCHIVE_DIR}/${DB_ARCHIVE_NAME}"
 readonly DB_DATA_DIR="${HOME}/mongo-data"
 readonly DB_LOG_DIR="${HOME}/mongo-logs"
@@ -40,7 +40,7 @@ echo "MongoDB started. Replica set yet to be initialised..."
 
 # --- Install Mongo Shell (mongosh) ----
 
-readonly MONGOSH_ARCHIVE="mongosh-2.1.10-linux-x64.tgz"
+readonly MONGOSH_ARCHIVE="mongosh-2.9.2-linux-x64.tgz"
 readonly FULL_MONGOSH_ARCHIVE_PATH="${ARCHIVE_DIR}/${MONGOSH_ARCHIVE}"
 readonly MONGOSH_INSTALL_DIR="${HOME}/mongosh"
 

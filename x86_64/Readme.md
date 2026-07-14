@@ -6,6 +6,8 @@ This `x86_64` demo natively delivers:
 - MongoDB agent on each node
 - management using [Ops Manager](https://www.mongodb.com/docs/ops-manager/current/?msockid=24798157dea1691f00429729dffd68d2)
 
+Make sure [pre-requisites](#pre-requisites) are fulfilled before running:
+
 ```shell
 cd ./ops-manager
 limactl start ops-manager.yaml

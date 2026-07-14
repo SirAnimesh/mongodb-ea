@@ -6,9 +6,11 @@ This `container` demo natively delivers:
 - MongoDB agent on each node
 - management using [Ops Manager](https://www.mongodb.com/docs/ops-manager/current/?msockid=24798157dea1691f00429729dffd68d2)
 
-```shell
-
-```
+1. Start Ops Manager: `docker compose up -d ops-manager`
+2. Wait a couple mins, then visit `localhost:8080` in your browser
+3. In `Project Settings`, copy Project ID and create an Agent API Key
+4. Save those values in `.env` at root of this project (`container/`), see `.env.example` for format.
+5. Now spin up the database nodes: `docker compose up -d node1 node2 node3`
 
 ## Pre-requisites
 

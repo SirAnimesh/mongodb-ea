@@ -1,81 +1,96 @@
-# MongoDB Enterprise Advanced
+# MongoDB in a box
 
-Enterprise Advanced is a **subscription** not a product. It bundles commercially licenced MongoDB Enterprise Server with
-a suite of operational tooling. There are no perpetual licences. Customers cannot buy it online, they have to come through
-our enterprise Sales channels.
+This repository provides five independent approaches to stand up a MongoDB Enterprise Advanced cluster. All share the 
+same fundamental architecture:
 
-## What's in the box
+```
+Ops Manager (control plane)  ───  Automation Agents (on each node)  ───  mongod (the database)
+```
 
-Every EA subscription includes:
+No matter which model you use, the runtime looks the same:
 
-- MongoDB Enterprise Server
-- Ops Manager and Cloud Manager
-- Enteprise Kubernetes Operator
-- BI Connector
+1. **Control plane** (Ops Manager or Cloud Manager) holds the desired cluster state and pushes configs to agents
+2. **Automation Agent** on each node registers with the control plane via `mmsBaseUrl` + API key
+3. Agent downloads MongoDB binaries, writes config files, and manages `mongod` as a child process
+4. You deploy replica sets / sharded clusters from the Ops Manager or Cloud Manager web UI
 
-The EA differentiation is management tooling, support, security (TDE/Kerberos/auditing) and indemnification.
+### Key Gotchas
 
-## Tooling by deployment model
+- **Kernel ≥ 6.19**: MongoDB 8.0 crashes due to `tcmalloc`; blocked by `script.py`
+- **QEMU SLIRP bug**: Large downloads inside Lima VMs crash the VM; worked around with rate-limiting
+- **No ARM64 Ops Manager**: Must use Cloud Manager on `aarch64`
+- **Docker Compose is for demos only**; no orchestration, no failover
+- **`no-sudo` has no elevated fd limits**; risks throttling under load
 
-### Bare metal or on a VM
+## Deployment Models
 
-- Enterprise Server binaries: install `mongod` and `mongos` from the tarball archive or distro package
-- Ops Manager: the application, its backing database and backup store
-- MongoDB Agent: on each host, used by Ops Manager for automation, monitoring and backup
-- BI connector if you need SQL/BI access
-- Admin tooling:
-  - `mongosh` Mongo Shell
-  - `mongodump` and `mongorestore` for backups
-  - Compass
+### 1. `container/` — Docker Compose (simplest, for demos)
 
-Customers typically deploy a 3-node replica sets or sharded clusters. See [bare-metal](/bare-metal) for a sample.
+A single `compose.yaml` spins up 5 containers:
 
-### In a container
+| Container | Role |
+|---|---|
+| `ops-manager-db` | MongoDB Enterprise Server acting as Ops Manager's backing database (AppDB) |
+| `ops-manager` | Self-hosted Ops Manager web UI/control plane (Rocky Linux 9, port 8080) |
+| `node1`, `node2`, `node3` | Data-bearing nodes — each runs the **Automation Agent** as the foreground process |
 
-- `mongodb-enteprise-server` container image
-- Persistent volumes - map `/data/db`
-- Ops Manager 
-- MongoDB Agent in each container
-- Admin tooling:
-  - `mongosh` Mongo Shell
-  - `mongodump` and `mongorestore` for backups
-  - Compass
+**Key detail:** The agent doesn't just run as a side-service — it *is* the container's entrypoint. It manages `mongod` 
+as a child process, so Ops Manager can deploy, configure, and upgrade the database across all three nodes.
 
-Plain Docker or even Compose gives little in terms of orchestration. It's good for testing or demos, but production workloads
-should use Kubernetes. See [container](/container/) for a sample.
+The node Dockerfile downloads a pre-built agent `.deb`, and a `script.py` handles kernel compatibility checks (blocks 
+Linux 6.19+ due to a `tcmalloc` bug), TLS, initdb, and replica set initiation.
 
-### Kubernetes
+```
+compose.yaml  →  node/Dockerfile (agent)  →  ops-manager/Dockerfile (control plane)
+                     ↑                         ↑
+              script.py (init logic)    .env (MMS_GROUP_ID, MMS_API_KEY)
+```
 
-- MongoDB Controllers for Kubernetes
-- Ops Manager in Kubernetes
-- Admin Tooling
-- Admin tooling:
-  - `mongosh` Mongo Shell
-  - `mongodump` and `mongorestore` for backups
-  - Compass
+### 2. `x86_64/` — Lima VMs simulating bare metal (x86_64)
 
-MongoDB Controllers for Kubernetes is an EA feature. There's a community Kubernetes operator but it does not support 
-sharded clusters. To keep us on our toes, there's an Atlas Kubernetes operator as well, but that provisions Atlas clusters
-and is not relevant to EA.
+Uses [Lima](https://lima-vm.io) to create lightweight Rocky Linux 9 VMs on a single host. Two VM types:
 
-See [kubernetes](/kubernetes) for a sample.
+| VM | Resources | Config |
+|---|---|---|
+| Ops Manager VM | 2 CPU, 4GB RAM, 30GB disk | `ops-manager/ops-manager.yaml` |
+| 3× Node VMs | 1 CPU, 2GB RAM, 20GB disk each | `nodes/mongod.yaml` |
 
----
+**Orchestration flow managed by `nodes/cluster.sh`:**
+1. Launches 3 node VMs with `limactl`
+2. Reads the `user-v2` network IPs (192.168.104.x) for each VM
+3. Writes `/etc/hosts` entries so nodes can reach each other by name
+4. Injects `MMS_GROUP_ID` and `MMS_API_KEY` into each node's agent config file
+5. Restarts each agent so it registers with Ops Manager
 
-## Comparison of deployment models (AI generated 2026-06-22)
+**Provisioning scripts** (`provision-ops-manager.sh`, `provision-agent.sh`) handle `dnf` repo setup, RPM installation, 
+systemd service creation, and a critical workaround: **rate-limiting all downloads** to 20MB/s to avoid a QEMU SLIRP 
+networking bug that crashes VMs when transferring large files (like the 2.4GB Ops Manager RPM).
 
-| Dimension | VM / Bare Metal | Container (Docker / standalone) | Kubernetes |
-|---|---|---|---|
-| Database engine | Enterprise Server binaries (`mongod`, `mongos`) via tarball or RPM/DEB | `mongodb-enterprise-server` container image | Enterprise Server pods, managed by the Operator |
-| Packaging / install | OS packages for RHEL/CentOS, Ubuntu, Debian, SUSE, Amazon Linux, Windows (incl. s390x/ppc64le) | Container image + persistent volume mapped to `/data/db` | StatefulSets + PersistentVolumeClaims, reconciled from Custom Resources |
-| Orchestration tool | Ops Manager (self-hosted) or Cloud Manager (SaaS) | None native — single node only; no failover/upgrades | MongoDB Enterprise Kubernetes Operator ("Controllers for Kubernetes") |
-| How you deploy | Ops Manager Automation, single-click installs/upgrades | `docker run` / Compose (dev/test) | `kubectl apply` of `MongoDB` / `MongoDBMultiCluster` CRs |
-| Control plane required | Ops Manager (needs its own Application DB + backup store) or Cloud Manager | Optional — MongoDB Agent if managed by OM/CM | Ops Manager or Cloud Manager, pointed at via ConfigMap + credentials Secret; OM itself can run in K8s |
-| On-host agent | MongoDB Agent (automation + monitoring + backup) per host | MongoDB Agent in container (if OM/CM-managed) | Operator-managed Agent sidecars |
-| Monitoring / alerting | Ops Manager / Cloud Manager (100+ metrics, custom alerts) | Via OM/CM if agent attached | Via OM/CM |
-| Backup / PITR | Ops Manager / Cloud Manager continuous backup + point-in-time restore | `mongodump` / `mongorestore`, or OM/CM if managed | Via OM/CM |
-| HA model | Hand-built 3-node replica sets / sharded clusters | None (single node); not production-suitable | Replica sets, sharded clusters, multi-cluster (GA) for cross-region resilience + auto-remediation |
-| Search / Vector Search | Self-managed (Public Preview) | Limited | Self-managed via Operator (Public Preview) |
-| Day-to-day tooling | mongosh, MongoDB Database Tools, Compass, BI Connector, mongocli / OM CLI | mongosh, Database Tools, Compass (connect as normal) | mongosh, Database Tools, Compass; `kubectl` for lifecycle |
-| Best for | Classic on-prem/private-cloud production | Dev/test, demos, single-node work | Production containers, portability, multi-region |
-| Main caveat | Ops Manager is non-trivial to stand up (AppDB + blockstore); attach Professional Services for POCs | No orchestration — no failover, rolling upgrades, or self-healing | Requires OM/CM control plane; use the Enterprise Operator, not the Community one (no sharding, not production-grade) |
+```
+lima-on-fedora.sh  →  ops-manager.yaml  →  provision-ops-manager.sh
+                                        →  mongod.yaml  →  provision-agent.sh
+                                        →  cluster.sh (orchestrator)
+```
+
+### 3. `aarch64/` — Lima VMs targeting ARM64 with Cloud Manager
+
+Since Ops Manager has **no ARM64 build**, this variant substitutes **Cloud Manager** (MongoDB's SaaS control plane at 
+`cloud.mongodb.com`) instead of self-hosting Ops Manager. The architecture is otherwise identical, but `cluster.sh` 
+passes `MMS_GROUP_ID`/`MMS_API_KEY` as `limactl` params at create time (sourcing from `.env`).
+
+### 4. `no-sudo/` — Tarball-based, air-gapped, no root
+
+For environments with **no internet and no `sudo`**. Everything is pre-downloaded tarballs extracted under `$HOME`:
+
+| Script | What it installs |
+|---|---|
+| `mongodb.sh` | MongoDB Enterprise Server as AppDB, initiates a single-node replica set (`opsmgrRS`) |
+| `ops-manager.sh` | Ops Manager from tarball, reconfigures Java heap, points at AppDB |
+| `automation-agent.sh` | Agent on each data node, configured to talk to the Ops Manager host |
+| `start-ops-manager.sh` / `start-automation-agent.sh` | `cron @reboot` survival scripts (no systemd) |
+
+No `/etc/security/limits.conf` edits possible, so file descriptor limits stay low which is not recommended for production.
+
+### 5. `kubernetes/`
+
+Intended for the MongoDB Enterprise Kubernetes Operator, but not yet implemented.
