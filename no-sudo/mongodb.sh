@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+
+# Increase the maximum number of open file descriptors for this shell session
+# 64000 is the recommended minimum for MongoDB
+ulimit -n 64000
+
 # The internal field separator determines how Bash splits words.
 # Default includes spaces, which causes issues when iterating over filepaths containing spaces.
 # Restrict it to newlines and tabs
@@ -8,7 +13,7 @@ IFS=$'\n\t'
 
 # --- Configuration ---
 
-readonly ARCHIVE_DIR="${HOME}/downloads"
+readonly ARCHIVE_DIR="${HOME}/Downloads"
 readonly DB_INSTALL_DIR="${HOME}/mongodb"
 readonly DB_ARCHIVE_NAME="mongodb-linux-x86_64-enterprise-rhel93-8.3.4.tgz"
 readonly FULL_DB_ARCHIVE_PATH="${ARCHIVE_DIR}/${DB_ARCHIVE_NAME}"
@@ -33,10 +38,10 @@ echo "Starting MongoDB daemon (mongod)..."
   --logpath "${DB_LOG_DIR}/mongod.log" \
   --fork \
   --bind_ip "127.0.0.1" \
-  --port 27017 \
-  --replSet opsmgrRS
+  --port 27017 
 
-echo "MongoDB started. Replica set yet to be initialised..."
+echo "MongoDB started. Waiting for it to be healthy..."
+sleep 5
 
 # --- Install Mongo Shell (mongosh) ----
 
@@ -55,20 +60,5 @@ tar -xzf "${FULL_MONGOSH_ARCHIVE_PATH}" -C "${MONGOSH_INSTALL_DIR}" --strip-comp
 
 echo "Mongo Shell installed at ${MONGOSH_INSTALL_DIR}"
 
-# --- Initialise MongoDB replica set ---
-
-echo "Initialising MongoDB replica set..."
-
-# Give mongod daemon time to fully bind to port
-sleep 2
-
-# --quiet suppresses the large MongoDB ASCII art banner
-# --eval executes the javascript code passed as argument
-"${MONGOSH_INSTALL_DIR}/bin/mongosh" mongodb://127.0.0.1:27017 --quiet --eval 'rs.initiate()'
-
-echo "Waiting for replica set to be healthy..."
-
-sleep 5
-
-echo "Replica set status"
-"${MONGOSH_INSTALL_DIR}/bin/mongosh" mongodb://127.0.0.1:27017 --quiet --eval 'rs.status()'
+echo "MongoDB health status:"
+"${MONGOSH_INSTALL_DIR}/bin/mongosh" --quiet --eval 'db.runCommand({ ping: 1 })'

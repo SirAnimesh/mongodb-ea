@@ -8,7 +8,7 @@ IFS=$'\n\t'
 
 # --- Configuration ---
 
-readonly ARCHIVE_DIR="${HOME}/downloads"
+readonly ARCHIVE_DIR="${HOME}/Downloads"
 readonly INSTALL_DIR="${HOME}/automation-agent"
 readonly ARCHIVE_NAME="mongodb-mms-automation-agent-latest.rhel8_x86_64.tar.gz"
 readonly FULL_ARCHIVE_PATH="${ARCHIVE_DIR}/${ARCHIVE_NAME}"

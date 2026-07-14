@@ -8,7 +8,7 @@ IFS=$'\n\t'
 
 # --- Configuration ---
 
-readonly ARCHIVE_DIR="${HOME}/downloads"
+readonly ARCHIVE_DIR="${HOME}/Downloads"
 readonly INSTALL_DIR="${HOME}/ops-manager"
 readonly ARCHIVE_NAME="mongodb-mms-8.0.25.500.20260703T0841Z.tar.gz"
 readonly FULL_ARCHIVE_PATH="${ARCHIVE_DIR}/${ARCHIVE_NAME}"
@@ -25,6 +25,7 @@ fi
 echo "Extracting Ops Manager to ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}"
 tar -xzf "${FULL_ARCHIVE_PATH}" -C "${INSTALL_DIR}" --strip-components=1
+cp "${ARCHIVE_DIR}"/mongodb_version_manifest.json" "${INSTALL_DIR}/conf/mongodb_version_manifest.json"
 
 echo "Extraction complete"
 echo "Configuring Ops Manager..."
@@ -37,7 +38,7 @@ sed -i 's|^BASE_PORT=.*|BASE_PORT="8085"|' "${CONFIG_FILE}"
 # Set the Ops Manager URL to localhost:8085
 sed -i 's|^mms.centralUrl=.*|mms.centralUrl=http://127.0.0.1:8085|' "${PROPERTIES_FILE}"
 # Point Ops Manager to the local MongoDB replica set
-sed -i 's|^mongo.mongoUri=.*|mongo.mongoUri=mongodb://127.0.0.1:27017/?replicaSet=opsmgrRS|' "${PROPERTIES_FILE}"
+sed -i 's|^mongo.mongoUri=.*|mongo.mongoUri=mongodb://127.0.0.1:27017|' "${PROPERTIES_FILE}"
 
 # Enable Local Mode so Ops Manager serves MongoDB binaries to agents without internet
 cat >> "${PROPERTIES_FILE}" << EOF
