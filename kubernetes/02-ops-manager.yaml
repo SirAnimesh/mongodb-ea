@@ -1,0 +1,26 @@
+apiVersion: mongodb.com/v1
+kind: MongoDBOpsManager
+metadata:
+  name: ops-manager
+  namespace: mongodb
+spec:
+  replicas: 1
+  version: "8.0.25"
+  adminCredentials: ops-manager-admin-secret
+  externalConnectivity:
+    type: NodePort      # exposes Ops Manager outside the cluster
+  configuration:
+    mms.ignoreInitialUiSetup: "true"
+    automation.versions.source: "mongodb"
+    mms.fromEmailAddr: admin@example.com
+    mms.replyToEmailAddr: admin@example.com
+    mms.adminEmailAddr: admin@example.com
+    mms.mail.transport: smtp
+    mms.mail.hostname: localhost
+    mms.mail.port: "25"
+  backup:
+    enabled: false
+  applicationDatabase:
+    topology: SingleCluster
+    members: 3
+    version: "8.3.4"
