@@ -91,6 +91,34 @@ For environments with **no internet and no `sudo`**. Everything is pre-downloade
 
 No `/etc/security/limits.conf` edits possible, so file descriptor limits stay low which is not recommended for production.
 
-### 5. `kubernetes/`
+### 5. `kubernetes/` — MongoDB Operator (production-grade)
 
-Intended for the MongoDB Enterprise Kubernetes Operator, but not yet implemented.
+Uses the **MongoDB Controllers for Kubernetes Operator** to run everything declaratively on a Kubernetes cluster (local
+[Kind](https://kind.sigs.k8s.io) for the demo). Instead of wiring containers by hand, you `kubectl apply` YAML manifests
+and the Operator reconciles them into running infrastructure.
+
+Installed once via Helm, the Operator registers CRDs (`MongoDBOpsManager`, `MongoDB`, `MongoDBUser`) so Kubernetes
+understands MongoDB natively. Ops Manager and the database run as `StatefulSet`s with `PersistentVolumeClaim`s for stable
+identity and storage.
+
+Seven manifests, applied in order, see [kubernetes/Readme.md](kubernetes/Readme.md) for detail:
+
+| Manifest | Creates |
+|---|---|
+| `01-ops-manager-admin-secret.yaml` | Ops Manager first-user credentials |
+| `02-ops-manager.yaml` | `MongoDBOpsManager` — Ops Manager app + 3-node AppDB |
+| `03-project-configmap.yaml` | Project reference (`baseUrl`, `orgId`) for the Operator |
+| `04-api-key-secret.yaml` | Org programmatic API keys |
+| `05-replicaset.yaml` | `MongoDB` — the 3-node replica set |
+| `06-db-user-secret.yaml` | Database user password |
+| `07-mongodb-user.yaml` | `MongoDBUser` — SCRAM user with roles |
+
+```
+helm install (Operator + CRDs)  →  kubectl apply 01..07  →  Operator reconciles
+                                                             ↓
+                                       Ops Manager + AppDB + replica set StatefulSets
+```
+
+The Operator is the bridge between Kubernetes (pods, StatefulSets, volumes) and MongoDB (replica sets,
+Ops Manager, agents). It translates simple YAML into the API calls and infrastructure to deploy MongoDB properly, and
+keeps reconciling — auto-replacing lost pods, handling rolling upgrades.
