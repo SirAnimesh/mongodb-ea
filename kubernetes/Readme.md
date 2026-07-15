@@ -49,7 +49,7 @@ sequence of API calls and infrastructure changes needed to deploy MongoDB proper
 > [!important]
 > Kubernetes is fiddly and there are many ways to break it. The above list is the happiest path, you'll likely veer away 
 > from it. Fret not, ask your AI what to do when you get stuck. It's usually a config field or two that spoils the party.
-> See [Gotchas](#gotchas)
+> See [Gotchas](https://github.com/SirAnimesh/mongodb-ea/tree/main/kubernetes#gotchas-ai-generated-may-have-errors)
 
 ## Pre-requisites
 
