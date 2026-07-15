@@ -12,23 +12,44 @@ logic (replica set initiation, upgrades, backup configuration) that otherwise ha
 
 ## Workflow
 
-1. Create a Kubernetes cluster - `kind create cluster`
-2. `helm install kubernetes-operator`
-3. `kubectl apply -f ops-manager.yaml`
-    - Operator sees a `MongoDBOpsManager` resource
-    - Operator creates `StatefulSet` for AppDB, Deployment for Ops Manager, Services, PVCs, Secrets
-    - Everything converges to "Running"
-4. `kubectl apply -f mongodb-replicaset.yaml`
-    - Operator sees a MongoDB resource
-    - Operator talks to Ops Manager API: "deploy a 3-node replica set"
-    - Ops Manager pushes config to automation agents
-    - Agents download MongoDB binaries, start `mongod` on each pod
-    - `StatefulSet` ensures stable identities: `mongo-0`, `mongo-1`, `mongo-2`
-5. `kubectl apply -f mongodb-user.yaml`
-    - Operator creates a database user via Ops Manager API
+1. Create a single-node Kubernetes cluster - `kind create cluster`
+2. Check it's up and running - `kubectl get nodes` - should see `kind-control-plane` with status `Ready`
+3. Create the `mongodb` Kubernetes namespace:
+   ```
+   kubectl create namespace mongodb
+   kubectl config set-context --current --namespace=mongodb
+   ```
+4. Install the MongoDB operator
+   ```
+   helm repo add mongodb https://mongodb.github.io/helm-charts
+   helm install kubernetes-operator mongodb/mongodb-kubernetes --namespace mongodb
+   ```
+5. Verify the Operator pod is running. You should see a pod with a name like `mongodb-kubernetes-operator-xxxx` in `Running`
+   status.
+   ```
+   kubectl get pods
+   ```
+6. Create admin secrets - `kubectl apply -f 01-ops-manager-admin-secret.yaml`
+7. Deploy Ops Manager - `kubectl apply -f 02-ops-manager.yaml`
+8. Use `kubectl get pods -w` or `kubectl get om -o yaml -w` to track deployment
+9. Once Ops Manager is running, get its URL - `kubectl get om ops-manager -o jsonpath='{.status.opsManager.url}'`
+10. Forward Ops Manager port for use outside the cluster: `kubectl port-forward svc/ops-manager-svc-ext 8080:8080`
+11. Log into Ops Manager at `localhost:8080` using credentials in `01-ops-manager-admin-secret.yaml` and copy the 
+    Organization ID and API keys.
+12. Paste these values in the appropriate fields in `03-project-configmap.yaml` and `04-api-key-secret.yaml`. **Not doing
+    this will break your deployment**.
+13. Deploy replica set: `kubectl apply -f 05-replicaset.yaml`.
+14. Track deployment `kubectl get mdb -o yaml -w` and wait for `status.phase` to turn `Running`. OR watch the pods come
+    up `kubectl get pods -w`.
+15. Finally, create the database user: `kubectl apply -f 06-db-user-secret.yaml -f 07-mongodb-user.yaml`.
 
 The Operator is the bridge between two domains: Kubernetes and MongoDB. It translates simple YAMLs into the complex
-sequence of API calls and infrastructure changes needed to deploy MongoDB properly on Kubernetes.  
+sequence of API calls and infrastructure changes needed to deploy MongoDB properly on Kubernetes.
+
+> [!important]
+> Kubernetes is fiddly and there are many ways to break it. The above list is the happiest path, you'll likely veer away 
+> from it. Fret not, ask your AI what to do when you get stuck. It's usually a config field or two that spoils the party.
+> See [Gotchas](#gotchas)
 
 ## Pre-requisites
 
@@ -168,3 +189,61 @@ After that, Kubernetes understands `kind: MongoDB` and `kind: MongoDBOpsManager`
 
 Kubernetes is designed to run on multiple physical machines. A laptop is just one machine. [kind](https://kind.sigs.k8s.io)
 fakes a cluster by running nodes as Docker containers on one machine.
+
+---
+
+## Gotchas (AI generated, may have errors)
+
+These are the non-obvious things that will trip you up on a local Kind cluster.
+
+### Docker memory
+
+Ops Manager alone wants ~5GB of RAM, and MongoDB's docs list **8GB as the bare minimum for just Ops Manager +
+AppDB** — before you add a workload replica set. On top of that you're running the Operator pod, a 3-node AppDB, and a
+3-node replica set, all on a single Kind node.
+
+Give Docker Desktop at least **16GB** (Settings → Resources → Memory). Kind restarts to pick up the new capacity, which
+bounces every pod at once. Check headroom with:
+
+```shell
+kubectl describe node kind-control-plane | grep -A 8 "Allocated resources"
+```
+
+If memory requests are near 100%, pods crawl or get `OOMKilled` and CrashLoop. You want requests under ~70%.
+
+### API key IP access list
+
+Programmatic API keys in Ops Manager can require an IP access list. The Operator calls the Ops Manager API from *inside*
+the cluster using a pod IP, so that IP must be on the list — otherwise the reconcile fails with:
+
+```
+Status: 403 (Forbidden), ErrorCode: RESOURCE_REQUIRES_ACCESS_LIST
+```
+
+Add the Kind pod CIDR `10.244.0.0/16` to the key's access list (Organization Access Manager → API Keys → Edit → Access
+List). The `/16` covers all pods, so it survives the Operator being rescheduled to a new pod IP.
+
+### `ops-manager-0` is the gate
+
+After any node restart, the replica set pods CrashLoop until `ops-manager-0` reaches `1/1`. This is expected — the agents
+can't fetch their config from a not-yet-ready Ops Manager. Ops Manager is a heavy Java app and takes several minutes.
+Wait for it before debugging the `mongod` pods.
+
+### Wrong project in the UI
+
+The Operator deploys into the project named in `03-project-configmap.yaml` (`projectName: my-project`), which is *not*
+the default project. If "Processes" looks empty, switch to `my-project` in the Ops Manager project dropdown.
+
+### Plaintext secrets in git
+
+`01-ops-manager-admin-secret.yaml`, `04-api-key-secret.yaml`, and `06-db-user-secret.yaml` contain plaintext
+credentials. Do not commit real values — use placeholders or `.gitignore`, or a sealed-secrets tool for anything real.
+
+### Connecting with `mongosh`
+
+If your password contains `!`, zsh treats it as history expansion and throws `event not found`. Wrap the connection
+string in **single quotes**:
+
+```shell
+mongosh 'mongodb://mms-scram-user-1:DemoPassword123!@localhost:27017/admin'
+```
